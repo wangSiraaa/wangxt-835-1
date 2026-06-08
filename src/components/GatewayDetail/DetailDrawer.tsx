@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, RotateCcw, AlertTriangle, Info, Clock, MapPin, Server } from 'lucide-react';
+import { X, RotateCcw, AlertTriangle, Info, Clock, MapPin, Server, Camera, FileText } from 'lucide-react';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { AlertBadge } from '@/components/common/AlertBadge';
 import { HeartbeatTimeline } from './HeartbeatTimeline';
@@ -11,17 +11,19 @@ import { useHeartbeat } from '@/hooks/useHeartbeat';
 import { useGatewayStatus } from '@/hooks/useGatewayStatus';
 import { formatDateTime, formatRelativeTime } from '@/utils/dateUtils';
 import { mockProjects } from '@/data/mockProjects';
-import { getAlertLevelLabel, getAlertLevelColor } from '@/utils/statusUtils';
+import { getAlertLevelLabel, getAlertLevelColor, getStatusLabel } from '@/utils/statusUtils';
+import type { OfflineSnapshot } from '@/types';
 
 export const DetailDrawer: React.FC = () => {
   const { selectedGatewayId, isDrawerOpen, closeDrawer, showToast } = useUIStore();
-  const { gateways, markAsRecovered, addProcessRecord, getRecordsByGatewayId } = useGatewayStore();
+  const { gateways, markAsRecovered, addProcessRecord, getRecordsByGatewayId, getSnapshotByGatewayId, generateOfflineSnapshot } = useGatewayStore();
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'heartbeat' | 'alerts' | 'records'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'heartbeat' | 'alerts' | 'snapshot' | 'records'>('overview');
 
   const gateway = gateways.find((g) => g.id === selectedGatewayId);
   const { heartbeats, frequencyData, stats } = useHeartbeat(selectedGatewayId || '');
   const records = getRecordsByGatewayId(selectedGatewayId || '');
+  const snapshot = getSnapshotByGatewayId(selectedGatewayId || '');
 
   const dummyGateway: any = gateway || {
     id: '',
@@ -40,6 +42,11 @@ export const DetailDrawer: React.FC = () => {
 
   const project = mockProjects.find((p) => p.id === gateway.projectId);
   const unresolvedAlerts = gateway.alerts.filter((a) => !a.resolved);
+
+  const handleGenerateSnapshot = () => {
+    const result = generateOfflineSnapshot(gateway.id);
+    showToast(result.message);
+  };
 
   const handleMarkRecovered = () => {
     const success = markAsRecovered(gateway.id);
@@ -75,6 +82,7 @@ export const DetailDrawer: React.FC = () => {
     { id: 'overview', label: '概览' },
     { id: 'heartbeat', label: '心跳' },
     { id: 'alerts', label: '告警', badge: unresolvedAlerts.length },
+    { id: 'snapshot', label: '离线快照', badge: snapshot ? 1 : 0 },
     { id: 'records', label: '处理记录', badge: records.length },
   ] as const;
 
@@ -271,6 +279,118 @@ export const DetailDrawer: React.FC = () => {
                         </p>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'snapshot' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-sm font-medium text-slate-300">离线快照</h4>
+                  </div>
+                  {!snapshot && actualStatus !== 'offline' && (
+                    <button
+                      onClick={handleGenerateSnapshot}
+                      disabled={true}
+                      className="px-3 py-1.5 text-xs bg-slate-700 text-slate-400 rounded-md opacity-50 cursor-not-allowed"
+                      title="仅离线网关可生成快照"
+                    >
+                      生成快照
+                    </button>
+                  )}
+                  {!snapshot && actualStatus === 'offline' && (
+                    <button
+                      onClick={handleGenerateSnapshot}
+                      className="px-3 py-1.5 text-xs bg-amber-500/20 text-amber-400 rounded-md hover:bg-amber-500/30 transition-colors"
+                    >
+                      生成快照
+                    </button>
+                  )}
+                </div>
+
+                {snapshot ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-slate-900/50 border border-amber-500/30">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-xs font-medium text-amber-400">
+                          快照已生成
+                        </span>
+                        <span className="text-xs text-slate-500 ml-auto">
+                          {formatRelativeTime(snapshot.generatedAt)}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-400">快照生成时间</span>
+                          <span className="text-xs text-slate-200 font-mono">
+                            {formatDateTime(snapshot.generatedAt)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-400">离线前状态</span>
+                          <span className="text-xs text-amber-400">
+                            {getStatusLabel(snapshot.statusBeforeOffline)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs font-medium text-slate-300">最后心跳</span>
+                      </div>
+                      <p className="text-sm font-mono text-cyan-400">
+                        {formatDateTime(snapshot.lastHeartbeat)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {formatRelativeTime(snapshot.lastHeartbeat)}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Server className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs font-medium text-slate-300">最后上报值</span>
+                      </div>
+                      <p className="text-3xl font-bold font-mono text-emerald-400">
+                        {snapshot.lastReportedValue}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">传感器读数</p>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs font-medium text-slate-300">处理备注</span>
+                      </div>
+                      <p className="text-sm text-slate-300">{snapshot.processingRemark}</p>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
+                      <p className="text-xs text-slate-500">
+                        快照ID：{snapshot.id}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 space-y-3">
+                    <Camera className="w-12 h-12 text-slate-600 mx-auto" />
+                    <p className="text-sm text-slate-500">
+                      {actualStatus === 'offline'
+                        ? '网关已离线，点击上方按钮生成离线快照'
+                        : '网关尚未离线，离线快照将在网关超时后自动生成'}
+                    </p>
+                    {actualStatus !== 'offline' && (
+                      <p className="text-xs text-slate-600">
+                        当前状态：{getStatusLabel(actualStatus)}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

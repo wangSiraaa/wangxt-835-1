@@ -74,3 +74,20 @@ export interface ProjectHealth {
   alertCount: number;
   healthScore: number;
 }
+
+export interface OfflineSnapshot {
+  id: string;
+  gatewayId: string;
+  lastHeartbeat: Date;
+  lastReportedValue: number;
+  processingRemark: string;
+  generatedAt: Date;
+  statusBeforeOffline: GatewayStatus;
+}
+
+export interface ReportedValue {
+  gatewayId: string;
+  timestamp: Date;
+  value: number;
+  type: string;
+}

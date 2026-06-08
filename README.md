@@ -1,57 +1,139 @@
-# React + TypeScript + Vite
+# 采集网关状态屏
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+采集网关状态监控大屏，为运维团队提供网关设备实时状态可视化监控与问题处理平台。
 
-Currently, two official plugins are available:
+## 功能特性
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **状态总览**：在线/离线/超时/告警数量统计卡片
+- **网关列表**：分页展示网关设备，支持多维度筛选
+- **详情抽屉**：点击网关行展开，显示心跳历史、上报频率、处理建议
+- **告警筛选器**：按状态、项目、告警级别、时间范围筛选
+- **处理记录面板**：展示所有网关的处理历史记录
+- **项目健康概览**：按项目分组展示健康度统计
+- **离线快照**：网关离线时自动保存最后状态快照
 
-## Expanding the ESLint configuration
+## 离线快照功能
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 功能说明
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+当网关从在线变为离线时（心跳超时超过5分钟），系统自动保存离线快照，包含：
+- 最后一次心跳时间
+- 最近上报值
+- 处理备注
+- 快照生成时间
+- 离线前状态
+
+**核心规则**：
+- 仅在网关确实超时后生成快照
+- 正常在线的网关无法手动伪造离线记录
+- 已存在快照的网关不会重复生成
+- 运维重新打开详情页可查看快照
+
+### 入口说明
+
+1. **查看离线快照**：
+   - 点击任意网关行打开详情抽屉
+   - 切换到「离线快照」标签页
+   - 已离线网关会显示生成的快照信息
+
+2. **手动生成快照**：
+   - 仅状态为「离线」的网关显示「生成快照」按钮
+   - 在线/超时网关的按钮为禁用状态
+   - 点击按钮生成快照后自动刷新显示
+
+### 样例数据
+
+**预置离线网关（gw-005）**：
+```
+网关名称: 离线测试网关 (GW-TEST-001)
+状态: 离线
+最后心跳: 10分钟前
+最后上报值: 54.99
+处理备注: 网关离线，等待运维人员处理
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**预置回归测试网关（gw-011）**：
+```
+网关名称: 回归测试网关-超时转离线 (GW-REGRESS-001)
+状态: 超时 → 离线
+最后心跳: 5分10秒前
+验证场景: 超时阈值边界测试
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 验证脚本
 
-export default tseslint.config({
-  extends: [
-    // other configs...
-    // Enable lint rules for React
-    reactX.configs['recommended-typescript'],
-    // Enable lint rules for React DOM
-    reactDom.configs.recommended,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+### 运行测试
+
+```bash
+# 运行完整验证测试
+pnpm run test:snapshot
+
+# 运行冒烟测试（类型检查 + 快照测试）
+pnpm run smoke
+```
+
+### 测试场景
+
+| 测试用例 | 验证内容 | 预期结果 |
+|---------|---------|---------|
+| 测试1 | 在线网关生成快照 | 拒绝生成，提示未到离线阈值 |
+| 测试2 | 把在线网关推进超时状态 | 状态变为 timeout |
+| 测试3 | 超时网关生成快照 | 拒绝生成，提示未到离线阈值 |
+| 测试4 | 把网关推进离线状态 | 状态变为 offline |
+| 测试5 | 离线网关生成快照 | 成功生成快照 |
+| 测试6 | 重复生成快照 | 拒绝生成，提示已存在 |
+| 测试7 | 初始离线网关快照 | 加载时自动创建快照 |
+| 测试8 | recalculateStats 自动生成 | 调用后自动为离线网关创建快照 |
+
+## 技术栈
+
+- React 18 + TypeScript
+- Vite 构建工具
+- Zustand 状态管理
+- Tailwind CSS 样式
+- Recharts 图表库
+- Lucide React 图标
+
+## 开发命令
+
+```bash
+# 安装依赖
+pnpm install
+
+# 启动开发服务器
+pnpm run dev
+
+# 类型检查
+pnpm run check
+
+# 代码检查
+pnpm run lint
+
+# 构建生产版本
+pnpm run build
+
+# 预览构建结果
+pnpm run preview
+```
+
+## 阈值配置
+
+在 `src/utils/statusUtils.ts` 中配置：
+- `TIMEOUT_THRESHOLD`: 60秒（超时阈值）
+- `OFFLINE_THRESHOLD`: 300秒（离线阈值）
+
+## 项目结构
+
+```
+src/
+├── components/          # React 组件
+│   ├── GatewayDetail/   # 网关详情抽屉
+│   ├── GatewayList/     # 网关列表
+│   └── common/          # 通用组件
+├── data/                # 模拟数据
+├── hooks/               # 自定义 Hooks
+├── store/               # Zustand 状态管理
+├── types/               # TypeScript 类型定义
+├── utils/               # 工具函数
+└── pages/               # 页面组件
 ```
