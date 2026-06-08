@@ -42,10 +42,6 @@ export const DetailDrawer: React.FC = () => {
   const unresolvedAlerts = gateway.alerts.filter((a) => !a.resolved);
 
   const handleMarkRecovered = () => {
-    if (!canRecover) {
-      showToast('离线网关需先恢复连接，无法直接标记为已恢复');
-      return;
-    }
     const success = markAsRecovered(gateway.id);
     if (success) {
       showToast('网关已标记为已恢复');
@@ -324,12 +320,14 @@ export const DetailDrawer: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={handleMarkRecovered}
+                disabled={!canRecover}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   canRecover
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 active:scale-95'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700 opacity-60 hover:bg-slate-700/50 active:scale-95'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 active:scale-95 cursor-pointer'
+                    : 'bg-slate-800 text-slate-500 border border-slate-700 opacity-60 cursor-not-allowed'
                 }`}
                 title={!canRecover ? '离线网关需先恢复连接' : ''}
+                aria-disabled={!canRecover}
               >
                 <RotateCcw className="w-4 h-4" />
                 标记已恢复

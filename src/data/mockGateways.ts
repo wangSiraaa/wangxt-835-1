@@ -159,4 +159,17 @@ export const mockGateways: Gateway[] = [
     version: 'v2.3.0',
     alerts: [],
   },
+  {
+    id: 'gw-011',
+    name: '回归测试网关-超时转离线',
+    code: 'GW-REGRESS-001',
+    ip: '192.168.254.1',
+    projectId: 'proj-001',
+    status: 'timeout',
+    lastHeartbeat: new Date(now.getTime() - 5 * 60 * 1000 - 10 * 1000),
+    reportFrequency: 30,
+    location: '回归测试工位',
+    version: 'v2.5.0-TEST',
+    alerts: [],
+  },
 ];
